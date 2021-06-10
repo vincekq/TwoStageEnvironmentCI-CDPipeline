@@ -1,0 +1,252 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+           "ParameterGroups": [
+              {
+                 "Label": {
+                    "default": "UAT Configuration"
+                 },
+                 "Parameters": [
+                    "KeyName",
+                    "InstanceAMI",
+                    "InstanceNameTag",
+                    "InstanceType",
+                    "SubnetId",
+                    "VpcId"
+                 ]
+              },
+              {
+                 "Label": {
+                    "default": "LIVE Configuration"
+                 },
+                 "Parameters": [
+                    "LiveKeyName",
+                    "LiveInstanceAMI",
+                    "LiveInstanceNameTag",
+                    "LiveInstanceType",
+                    "LiveSubnetId",
+                    "LiveVpcId"
+                 ]
+              },
+             {
+                "Label": {
+                   "default": "Deployment Configuration"
+                },
+                "Parameters": [
+                   "RepositoryName",
+                   "BranchName",
+                   "CodeBuild",
+                   "AppName"
+                ]
+             }
+           ]
+        }
+     },
+    "Parameters": {
+        "KeyName": {
+            "Description": "The EC2 Key Pair to allow SSH access to the instance",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "LiveKeyName": {
+            "Description": "The EC2 Key Pair to allow SSH access to the instance",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "InstanceAMI":{
+            "Description": "The AMI Id",
+            "Type":"String"
+        },
+        "LiveInstanceAMI":{
+            "Description": "The AMI Id of the live server",
+            "Type":"String"
+        },
+        "InstanceNameTag": {
+            "Description": "The EC2 Name Tag",
+            "Type": "String"
+        },
+        "LiveInstanceNameTag": {
+            "Description": "The EC2 Name Tag of the live server",
+            "Type": "String"
+        },
+        "InstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "t2.micro",
+            "AllowedValues": [
+                "t2.small",
+                "t2.micro",
+                "t3.medium",
+                "m5.large"
+            ],
+            "ConstraintDescription": "must be a valid EC2 instance type."
+        },
+        "LiveInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "t3.medium",
+            "AllowedValues": [
+                "t2.small",
+                "t2.micro",
+                "t3.medium",
+                "m5.large"
+            ],
+            "ConstraintDescription": "must be a valid EC2 instance type."
+        },
+        "AppName": {
+            "Description": "Name of your app",
+            "Type": "String"
+        },
+        "RepositoryName": {
+            "Description": "Name of your repository",
+            "Type": "String"
+        },
+        "BranchName": {
+            "Description": "Repository branch name",
+            "Type": "String",
+            "Default": "master"
+        },
+        "CodeBuild": {
+            "Description": "Name of your build project",
+            "Type": "String"
+        },
+        "VpcId" : {
+            "Type" : "AWS::EC2::VPC::Id",
+            "Description" : "VPCId of Virtual Private Cloud (VPC)."
+        },
+        "LiveVpcId" : {
+            "Type" : "AWS::EC2::VPC::Id",
+            "Description" : "VPCId of Virtual Private Cloud (VPC)."
+        },
+        "SubnetId": {
+            "Description":"SubnetId in VPC",
+            "Type" : "AWS::EC2::Subnet::Id"
+        },
+        "LiveSubnetId": {
+            "Description":"SubnetId in VPC",
+            "Type" : "AWS::EC2::Subnet::Id"
+        }
+    },
+    "Resources": {
+        "ServerStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": "https://cf-vincent.s3-eu-west-1.amazonaws.com/Two-stage/serverStack.json",
+                "TimeoutInMinutes": "5",
+                "Parameters": {
+                    "KeyName": {
+                        "Ref": "KeyName"
+                    },
+                    "VpcId":{
+                        "Ref": "VpcId"
+                    },
+                    "SubnetId":{
+                        "Ref": "SubnetId"
+                    },
+                    "InstanceAMI": {
+                        "Ref": "InstanceAMI"
+                    },
+                    "InstanceNameTag": {
+                        "Ref": "InstanceNameTag"
+                    },
+                    "InstanceType": {
+                        "Ref": "InstanceType"
+                    },
+                    "LiveKeyName": {
+                        "Ref": "LiveKeyName"
+                    },
+                    "LiveVpcId":{
+                        "Ref": "LiveVpcId"
+                    },
+                    "LiveSubnetId":{
+                        "Ref": "LiveSubnetId"
+                    },
+                    "LiveInstanceAMI": {
+                        "Ref": "LiveInstanceAMI"
+                    },
+                    "LiveInstanceNameTag": {
+                        "Ref": "LiveInstanceNameTag"
+                    },
+                    "LiveInstanceType": {
+                        "Ref": "LiveInstanceType"
+                    }
+                }
+            }
+        },
+        "AppStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": "https://cf-vincent.s3-eu-west-1.amazonaws.com/Two-stage/codedeployStack.json",
+                "TimeoutInMinutes": "5",
+                "Parameters": {
+                    "AppName": {
+                        "Ref": "AppName"
+                    },
+                    "EC2Filter": {
+                        "Fn::GetAtt": [
+                            "ServerStack",
+                            "Outputs.InstanceNameTag"
+                        ]
+                    },
+                    "EC2FilterLive": {
+                        "Fn::GetAtt": [
+                            "ServerStack",
+                            "Outputs.LiveInstanceNameTag"
+                        ]
+                    }
+                }
+            }
+        },
+        "CodeBuildStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": "https://cf-vincent.s3-eu-west-1.amazonaws.com/Two-stage/codebuildStack.json",
+                "TimeoutInMinutes": "5",
+                "Parameters": {
+                    "CodeBuild": {
+                        "Ref": "CodeBuild"
+                    }
+                }
+            }
+        },
+        "PipelineStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": "https://cf-vincent.s3-eu-west-1.amazonaws.com/Two-stage/codepipelineStack.json",
+                "TimeoutInMinutes": "5",
+                "Parameters": {
+                    "BranchName": "master",
+                    "CodeDeploy": {
+                        "Fn::GetAtt": [
+                            "AppStack",
+                            "Outputs.StackName"
+                        ]
+                    },
+                    "RepositoryName": {
+                        "Ref": "RepositoryName"
+                    },
+                    "CodeBuild": {
+                        "Fn::GetAtt": [
+                            "CodeBuildStack",
+                            "Outputs.StackName"
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "StackRef": {
+            "Value": {
+                "Ref": "AppStack"
+            }
+        },
+        "OutputFromAppStack": {
+            "Value": {
+                "Fn::GetAtt": [
+                    "AppStack",
+                    "Outputs.StackName"
+                ]
+            }
+        }
+    }
+}

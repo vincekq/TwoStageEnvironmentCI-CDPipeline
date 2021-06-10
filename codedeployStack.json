@@ -1,0 +1,122 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Codeploy Application",
+    "Metadata": {},
+    "Parameters": {
+        "AppName": {
+            "Type": "String"
+        },
+        "EC2Filter": {
+            "Type": "String"
+        },
+        "EC2FilterLive": {
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "Application": {
+            "Type": "AWS::CodeDeploy::Application",
+            "Properties": {
+                "ApplicationName": {
+                    "Ref": "AppName"
+                },
+                "ComputePlatform": "Server"
+            }
+        },
+        "UATDeployment": {
+            "Type": "AWS::CodeDeploy::DeploymentGroup",
+            "Properties": {
+                "ApplicationName": {
+                    "Ref": "AppName"
+                },
+                "DeploymentGroupName": "UAT",
+                "Ec2TagFilters" : [{
+                    "Key" : "Name",
+                    "Value" : {
+                        "Ref": "EC2Filter"
+                    },
+                    "Type" : "KEY_AND_VALUE"
+                  }],
+                "ServiceRoleArn": {
+                    "Fn::GetAtt": [
+                        "CodeDeployServiceRole",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "LiveDeployment": {
+            "Type": "AWS::CodeDeploy::DeploymentGroup",
+            "Properties": {
+                "ApplicationName": {
+                    "Ref": "AppName"
+                },
+                "DeploymentGroupName": "LIVE",
+                "Ec2TagFilters" : [{
+                    "Key" : "Name",
+                    "Value" : {
+                        "Ref": "EC2FilterLive"
+                    },
+                    "Type" : "KEY_AND_VALUE"
+                  }],
+                "ServiceRoleArn": {
+                    "Fn::GetAtt": [
+                        "CodeDeployServiceRole",
+                        "Arn"
+                    ]
+                }
+            }
+        },
+        "CodeDeployServiceRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "codedeploy.amazonaws.com"
+                                ]
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Path": "/",
+                "ManagedPolicyArns": ["arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"]
+            }
+        }
+    },
+    "Outputs": {
+        "Application": {
+            "Description": "Newly Created App",
+            "Value": {
+                "Ref": "Application"
+            },
+            "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-ApplicationName" }}
+        },
+        "DeploymentGroup": {
+            "Description": "Newly Created Deployment",
+            "Value": {
+                "Ref": "UATDeployment"
+            },
+            "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-DeploymentGroup" }}
+        },
+        "LiveDeploymentGroup": {
+            "Description": "Newly Created Live Deployment",
+            "Value": {
+                "Ref": "LiveDeployment"
+            },
+            "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-LiveDeploymentGroup" }}
+        },
+        "StackName": {
+            "Description": "AppStack",
+            "Value": {
+                "Ref": "AWS::StackName"
+            },
+            "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}" }}
+        }
+    }
+}
